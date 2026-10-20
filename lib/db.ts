@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+import dns from "node:dns";
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 const g: any = global;
 const cached = g._mongoose || (g._mongoose = { conn: null, promise: null });
 export async function connectDB() {
