@@ -25,4 +25,4 @@ const JobSchema = new Schema({
   approvedAt: Date, completedAt: Date, deliveredAt: Date,
   driveLinks: [String], deliveryNote: String, optionalNote: String,
 }, { timestamps: true });
-export default mongoose.models.Job || mongoose.model("Job", JobSchema);
+export default (mongoose.models.Job || mongoose.model("Job", JobSchema)) as any;

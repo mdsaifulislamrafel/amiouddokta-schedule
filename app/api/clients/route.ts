@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Client from "@/models/Client";
+
 export async function GET(req: Request) {
   await connectDB();
   const sp = new URL(req.url).searchParams;
@@ -10,6 +11,7 @@ export async function GET(req: Request) {
   if (s) q.$or = [{ name: new RegExp(s, "i") }, { phone: new RegExp(s) }, { altPhones: new RegExp(s) }];
   return NextResponse.json(await Client.find(q).sort({ name: 1 }).lean());
 }
+
 export async function POST(req: Request) {
   await connectDB();
   try { return NextResponse.json(await Client.create(await req.json())); }

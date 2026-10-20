@@ -1,0 +1,1 @@
+export const FIELDS = ["serviceType","title","date","startTime","endTime","assignedTo","location","charge","paid","usePackage","expectedDeliveryDate","deliveryEstimate","deliveryPhone","driveLinks","deliveryNote","optionalNote"];

@@ -3,7 +3,7 @@ import { connectDB } from "@/lib/db";
 import Job from "@/models/Job";
 import Client from "@/models/Client";
 import { calcMinutes, sumMinutes } from "@/lib/utils";
-import { FIELDS } from "../route";
+import { FIELDS } from "@/lib/jobFields";
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   await connectDB();
