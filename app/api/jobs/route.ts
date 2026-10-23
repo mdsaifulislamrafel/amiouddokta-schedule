@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/db";
 import Client from "@/models/Client";
 import Job from "@/models/Job";
 import { FIELDS } from "@/lib/jobFields";
+import { findConflict, conflictMessage } from "@/lib/conflict";
 
 export async function GET(req: Request) {
   await connectDB();
@@ -17,6 +18,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   await connectDB();
   const b = await req.json();
+
+  // একই সময়ে অন্য কাজ আছে কিনা (ক্লায়েন্ট তৈরির আগেই চেক)
+  const clash = await findConflict(b.date, b.startTime, b.endTime);
+  if (clash) return NextResponse.json({ error: conflictMessage(clash) }, { status: 409 });
+
   let clientId = b.clientId;
   if (!clientId) {
     if (!b.newName || !b.newPhone) return NextResponse.json({ error: "ক্লায়েন্টের নাম ও নাম্বার দিন" }, { status: 400 });

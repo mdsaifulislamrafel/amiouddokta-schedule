@@ -4,6 +4,7 @@ import Job from "@/models/Job";
 import Client from "@/models/Client";
 import { calcMinutes, sumMinutes } from "@/lib/utils";
 import { FIELDS } from "@/lib/jobFields";
+import { findConflict, conflictMessage } from "@/lib/conflict";
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   await connectDB();
@@ -30,6 +31,13 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   if (b.clientId) job.client = b.clientId;
   job.durationMinutes = sumMinutes(job.sessions);
   const a = b.action;
+
+  // সাধারণ সেভ বা Approve এর সময় একই সময়ের অন্য কাজ চেক (নিজেকে বাদ দিয়ে)
+  if ((!a || a === "approve") && job.status !== "rejected") {
+    const clash = await findConflict(job.date, job.startTime, job.endTime, String(job._id));
+    if (clash) return NextResponse.json({ error: conflictMessage(clash) }, { status: 409 });
+  }
+
   if (a === "approve") { job.status = "approved"; job.approvedAt = new Date(); }
   if (a === "reject") job.status = "rejected";
   if (a === "complete") {
