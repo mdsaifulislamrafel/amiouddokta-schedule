@@ -13,7 +13,7 @@ label{font-size:13px;font-weight:600;display:block;margin-bottom:4px}
 table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{text-align:left;padding:8px;border-bottom:1px solid #e5e7eb;vertical-align:top}
 .badge{padding:2px 8px;border-radius:99px;font-size:12px;background:#e5e7eb;white-space:nowrap}
-.badge.pending{background:#fef3c7}.badge.approved{background:#dbeafe}.badge.completed{background:#ede9fe}.badge.delivered{background:#d1fae5}.badge.rejected{background:#fee2e2}.badge.vip{background:#fde68a}
+.badge.pending{background:#fef3c7}.badge.approved{background:#dbeafe}.badge.completed{background:#ede9fe}.badge.delivered{background:#d1fae5}.badge.rejected{background:#fee2e2}.badge.vip{background:#fde68a}.badge.edit{background:#cffafe;color:#155e75}
 .bar{height:12px;background:#e5e7eb;border-radius:9px;overflow:hidden}.bar>div{height:100%;background:#059669}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .stat{font-size:28px;font-weight:700}

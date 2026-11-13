@@ -1,1 +1,1 @@
-export const FIELDS = ["serviceType","title","date","startTime","endTime","assignedTo","location","charge","paid","usePackage","expectedDeliveryDate","deliveryEstimate","deliveryPhone","driveLinks","deliveryNote","optionalNote"];
+export const FIELDS = ["jobType","serviceType","title","date","startTime","endTime","assignedTo","location","footageSource","footageLinks","footageNote","charge","paid","usePackage","deductFrom","expectedDeliveryDate","deliveryEstimate","deliveryPhone","driveLinks","deliveryNote","optionalNote"];

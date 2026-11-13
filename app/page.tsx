@@ -21,7 +21,7 @@ export default function Dashboard() {
         <b>আমিও উদ্যোক্তা — শিডিউল</b>
         {admin ? (
           <>
-            <Link href="/jobs">কাজ / শিডিউল</Link><Link href="/jobs/new">+ নতুন কাজ</Link><Link href="/clients">ক্লায়েন্ট</Link>
+            <Link href="/jobs">কাজ / শিডিউল</Link><Link href="/jobs/new">+ নতুন কাজ</Link><Link href="/jobs/new?type=edit">+ এডিটের কাজ</Link><Link href="/clients">ক্লায়েন্ট</Link><Link href="/packages">প্যাকেজ</Link>
             <a href="#" style={{ marginLeft: "auto" }} onClick={async e => { e.preventDefault(); await fetch("/api/auth/logout", { method: "POST" }); location.reload(); }}>লগআউট</a>
           </>
         ) : (

@@ -1,13 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import JobTable from "@/components/JobTable";
-import { SERVICES, STATUS_LABEL, fmt12 } from "@/lib/utils";
+import { SERVICES, EDIT_SERVICES, STATUS_LABEL, JOB_TYPE_LABEL, statusLabel, fmt12 } from "@/lib/utils";
 
 const esc = (v: any) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export default function Jobs() {
   const [jobs, setJobs] = useState<any[]>([]);
-  const [f, setF] = useState({ status: "", serviceType: "", from: "", to: "" });
+  const [f, setF] = useState({ jobType: "", status: "", serviceType: "", from: "", to: "" });
   const load = () => {
     const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v) as any).toString();
     fetch("/api/jobs?" + q).then(r => r.json()).then(setJobs);
@@ -28,6 +28,7 @@ export default function Jobs() {
     const sorted = [...jobs].sort((a, b) => ((a.date || "") + (a.startTime || "")).localeCompare((b.date || "") + (b.startTime || "")));
 
     const filters = [
+      f.jobType && `ধরন: ${JOB_TYPE_LABEL[f.jobType]}`,
       f.status && `স্ট্যাটাস: ${(STATUS_LABEL as any)[f.status] || f.status}`,
       f.serviceType && `সার্ভিস: ${f.serviceType}`,
       f.from && `থেকে: ${f.from}`,
@@ -39,9 +40,9 @@ export default function Jobs() {
         <td>${i + 1}</td>
         <td>${esc(j.client?.name || "-")}</td>
         <td>${esc(j.client?.phone || "-")}</td>
-        <td>${esc(j.serviceType)}${j.title ? `<br><small>${esc(j.title)}</small>` : ""}</td>
+        <td>${j.jobType === "edit" ? "[শুধু এডিট] " : ""}${esc(j.serviceType)}${j.title ? `<br><small>${esc(j.title)}</small>` : ""}</td>
         <td>${esc(j.date)}<br>${j.startTime && j.endTime ? esc(fmt12(j.startTime)) + " - " + esc(fmt12(j.endTime)) : "-"}</td>
-        <td>${esc((STATUS_LABEL as any)[j.status] || j.status)}</td>
+        <td>${esc(statusLabel(j.status, j.jobType))}</td>
       </tr>`).join("");
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>কাজের শিডিউল লিস্ট</title>
@@ -75,8 +76,9 @@ export default function Jobs() {
   return (
     <div className="card">
       <div className="grid" style={{ marginBottom: 12 }}>
+        <div><label>কাজের ধরন</label><select className="input" value={f.jobType} onChange={e => set("jobType", e.target.value)}><option value="">সব</option>{Object.entries(JOB_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
         <div><label>স্ট্যাটাস</label><select className="input" value={f.status} onChange={e => set("status", e.target.value)}><option value="">সব</option>{Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v as string}</option>)}</select></div>
-        <div><label>সার্ভিস</label><input className="input" list="svc" placeholder="সব" value={f.serviceType} onChange={e => set("serviceType", e.target.value)} /><datalist id="svc">{SERVICES.map(s => <option key={s} value={s} />)}</datalist></div>
+        <div><label>সার্ভিস</label><input className="input" list="svc" placeholder="সব" value={f.serviceType} onChange={e => set("serviceType", e.target.value)} /><datalist id="svc">{[...SERVICES, ...EDIT_SERVICES].map(s => <option key={s} value={s} />)}</datalist></div>
         <div><label>থেকে</label><input type="date" className="input" value={f.from} onChange={e => set("from", e.target.value)} /></div>
         <div><label>পর্যন্ত</label><input type="date" className="input" value={f.to} onChange={e => set("to", e.target.value)} /></div>
       </div>

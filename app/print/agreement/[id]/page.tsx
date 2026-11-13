@@ -22,7 +22,18 @@ export default function Agreement({ params }: { params: { id: string } }) {
   const due = (j.charge || 0) - (j.paid || 0);
   const today = new Date().toLocaleDateString("en-GB");
 
-  const terms = [
+  const isEdit = j.jobType === "edit";
+  const fromMoney = j.usePackage && j.deductFrom === "money";
+  const editTerms = [
+    "The client provides the raw footage; the client is responsible for its quality, ownership and legality.",
+    "Editing will follow the instructions agreed at the time of booking; major changes may cost extra.",
+    "Minor revisions are included; additional revision rounds may be charged separately.",
+    "The edited video will be delivered through a Google Drive link.",
+    "The estimated delivery time is approximate and may vary depending on footage length and workload.",
+    "Raw footage may be removed from our storage 30 days after delivery.",
+    "The remaining balance must be paid before delivery.",
+  ];
+  const shootTerms = [
     "The work date, time, and location have been determined by mutual agreement between both parties.",
     "Any schedule changes must be communicated at least 24 hours in advance.",
     "Additional charges may apply if the work exceeds the scheduled duration.",
@@ -32,6 +43,10 @@ export default function Agreement({ params }: { params: { id: string } }) {
     "The advance payment is non-refundable if the booking is canceled after the shoot has started.",
     "The remaining balance must be paid before delivery.",
   ];
+  const terms = isEdit ? editTerms : shootTerms;
+  const billing = !j.usePackage ? "Separate charge (not from package)"
+    : fromMoney ? `Deducted from package balance${j.client?.pkg?.name ? ` (${j.client.pkg.name})` : ""}`
+    : `Deducted from package hours${j.client?.pkg?.name ? ` (${j.client.pkg.name})` : ""}`;
 
   const rows: [string, React.ReactNode][] = [
     [
@@ -41,15 +56,27 @@ export default function Agreement({ params }: { params: { id: string } }) {
         {j.title ? ` — ${j.title}` : ""}
       </b>,
     ],
-    ["Date", j.date],
-    [
-      "Time",
-      `${fmt12(j.startTime)} - ${fmt12(j.endTime)}${
-        planned != null ? ` (${fmtDur(planned)})` : ""
-      }`,
-    ],
-    ["Location", j.location || "-"],
-    ["Assigned To", j.assignedTo || "-"],
+    ...(isEdit
+      ? ([
+          ["Work Type", "Editing only (client-provided footage)"],
+          ["Footage Source", j.footageSource === "other_studio" ? "Shot elsewhere" : "Shot by client"],
+          ["Footage Received", j.date],
+          ["Editor", j.assignedTo || "-"],
+          ...(j.footageNote ? [["Instructions", j.footageNote]] : []),
+          ...(j.durationMinutes ? [["Editing Time", fmtDur(j.durationMinutes)]] : []),
+        ] as [string, React.ReactNode][])
+      : ([
+          ["Date", j.date],
+          [
+            "Time",
+            `${fmt12(j.startTime)} - ${fmt12(j.endTime)}${
+              planned != null ? ` (${fmtDur(planned)})` : ""
+            }`,
+          ],
+          ["Location", j.location || "-"],
+          ["Assigned To", j.assignedTo || "-"],
+        ] as [string, React.ReactNode][])),
+    ["Billing", billing],
     [
       "Delivery",
       `${j.expectedDeliveryDate || "-"}${
@@ -196,16 +223,16 @@ export default function Agreement({ params }: { params: { id: string } }) {
         </table>
 
         <div style={{ display: "flex", gap: 10, margin: "12px 0" }}>
-          {box("Total Charge", j.charge || 0, "67,56,202", "#3730a3")}
+          {box(fromMoney ? "From Package Balance" : "Total Charge", j.charge || 0, "67,56,202", "#3730a3")}
 
-          {box(
+          {!fromMoney && box(
             "Paid / Advance",
             j.paid || 0,
             "5,150,105",
             "#047857"
           )}
 
-          {box(
+          {!fromMoney && box(
             "Due Balance",
             due,
             due > 0 ? "220,38,38" : "5,150,105",

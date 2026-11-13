@@ -12,7 +12,7 @@ export async function GET() {
   void Client; // populate এর জন্য মডেল রেজিস্টার
   const today = new Date().toLocaleDateString("en-CA", { timeZone: process.env.APP_TZ || "Asia/Dhaka" }); // YYYY-MM-DD
   const pop = { path: "client", select: SHOW_PHONE ? "name phone isMember" : "name isMember" };
-  const sel = "serviceType title date startTime endTime assignedTo status durationMinutes client";
+  const sel = "jobType serviceType title date startTime endTime assignedTo status durationMinutes client";
 
   const [upcoming, pending, toDeliver, overdue, todayCount] = await Promise.all([
     Job.find({ date: { $gte: today }, status: { $ne: "rejected" } }).select(sel).populate(pop).sort({ date: 1, startTime: 1 }).limit(200).lean(),

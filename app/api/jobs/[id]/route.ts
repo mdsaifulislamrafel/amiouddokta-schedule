@@ -26,14 +26,13 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   const b = await req.json();
   const job: any = await Job.findById(params.id);
   if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (job.status === "delivered") return NextResponse.json({ error: "ডেলিভারি হয়ে যাওয়া কাজ এডিট করা যাবে না" }, { status: 400 });
   FIELDS.forEach(k => b[k] !== undefined && (job[k] = b[k]));
   if (b.clientId) job.client = b.clientId;
   job.durationMinutes = sumMinutes(job.sessions);
   const a = b.action;
 
   // সাধারণ সেভ বা Approve এর সময় একই সময়ের অন্য কাজ চেক (নিজেকে বাদ দিয়ে)
-  if ((!a || a === "approve") && job.status !== "rejected") {
+  if ((!a || a === "approve") && job.status !== "rejected" && job.jobType !== "edit") {
     const clash = await findConflict(job.date, job.startTime, job.endTime, String(job._id));
     if (clash) return NextResponse.json({ error: conflictMessage(clash) }, { status: 409 });
   }
@@ -41,13 +40,17 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   if (a === "approve") { job.status = "approved"; job.approvedAt = new Date(); }
   if (a === "reject") job.status = "rejected";
   if (a === "complete") {
-    if (!job.sessions.length) return NextResponse.json({ error: "অন্তত একটি শুটিং সেশন (তারিখ, শুরু ও শেষের সময়) যোগ করুন" }, { status: 400 });
+    const isEdit = job.jobType === "edit";
+    // শুটিংয়ে সেশন লাগবেই; এডিটে শুধু প্যাকেজের ঘন্টা থেকে কাটলে এডিটের সময় লাগবে
+    if (!job.sessions.length && (!isEdit || (job.usePackage && job.deductFrom !== "money")))
+      return NextResponse.json({ error: isEdit ? "প্যাকেজের ঘন্টা থেকে কাটতে অন্তত একটি এডিটিং সময় যোগ করুন" : "অন্তত একটি শুটিং সেশন (তারিখ, শুরু ও শেষের সময়) যোগ করুন" }, { status: 400 });
     job.status = "completed"; job.completedAt = new Date();
   }
   if (a === "deliver") {
     if (!job.driveLinks?.length) return NextResponse.json({ error: "ডেলিভারি নোটে অন্তত একটি Google Drive লিংক দিন" }, { status: 400 });
     job.status = "delivered"; job.deliveredAt = new Date();
   }
+  if (a === "reopen") { job.status = "completed"; job.deliveredAt = undefined; } // রিভিশন / আবার কাজের জন্য
   await job.save();
   return NextResponse.json(await Job.findById(params.id).populate("client").lean());
 }
@@ -56,7 +59,6 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
   await connectDB();
   const j: any = await Job.findById(params.id);
   if (!j) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (j.status === "delivered") return NextResponse.json({ error: "ডেলিভারি হয়ে যাওয়া কাজ মোছা যাবে না" }, { status: 400 });
   await Job.findByIdAndDelete(params.id);
   return NextResponse.json({ ok: true });
 }
