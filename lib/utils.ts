@@ -49,3 +49,8 @@ export function waLink(phone: string | undefined, text: string) {
   return `https://wa.me/${n}?text=${encodeURIComponent(text)}`;
 }
 export const PAY_METHODS = ["Cash", "bKash", "Nagad", "Rocket", "Bank", "Card"];
+export const DESIGNATIONS = ["CEO", "COO", "CFO", "MD", "GM", "AGM", "Manager", "Accountant", "Executive"];
+export const collectorCode = (n?: number) => "RC-" + String(n || 0).padStart(3, "0");
+export const handoverNo = (n?: number) => "HO-" + String(n || 0).padStart(5, "0");
+export const SETTLE_LABEL: Record<string, string> = { holding: "গ্রহণকারীর হাতে", submitted: "অফিসে দিয়েছে (যাচাই বাকি)", received: "অফিস বুঝে নিয়েছে" };
+export const collectorLabel = (c: any) => c ? `${c.name} (${c.designation})` : "";

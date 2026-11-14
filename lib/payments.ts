@@ -9,6 +9,8 @@ export async function ensureTokens(list: any[]) {
 }
 import Job from "@/models/Job";
 import Client from "@/models/Client";
+import Collector from "@/models/Collector";
+import { collectorLabel } from "@/lib/utils";
 
 // পেমেন্ট যোগ/মোছার সময় কাজের paid বা প্যাকেজের paid আপডেট
 export async function applyPayment(p: any, sign: 1 | -1) {
@@ -18,7 +20,13 @@ export async function applyPayment(p: any, sign: 1 | -1) {
 }
 
 // নতুন রশিদ তৈরি; applyToTarget=false হলে শুধু রেকর্ড রাখে (যেমন কাজ তৈরির সময়ের অগ্রিম, যা আগেই paid এ আছে)
+// collector দিলে টাকা সেই ব্যক্তির হাতে (holding) থাকবে, অফিসে বুঝিয়ে দেওয়া পর্যন্ত
 export async function createPayment(data: any, applyToTarget = true) {
+  if (data.collector) {
+    const c: any = await Collector.findById(data.collector).lean();
+    if (!c) throw new Error("টাকা গ্রহণকারী পাওয়া যায়নি");
+    data = { ...data, settle: "holding", receivedBy: collectorLabel(c) };
+  } else delete data.collector;
   const p = await Payment.create({ ...data, receiptNo: await nextSeq("receipt"), token: newToken() });
   if (applyToTarget) await applyPayment(p, 1);
   return p;
@@ -33,6 +41,7 @@ export function receiptData(p: any) {
   return {
     _id: p._id, token: p.token, receiptNo: p.receiptNo, kind: p.kind, label: p.label, amount: p.amount, method: p.method,
     trxId: p.trxId, date: p.date, receivedBy: p.receivedBy, note: p.note, due,
+    collector: p.collector?.name ? { name: p.collector.name, phone: p.collector.phone, designation: p.collector.designation } : null,
     client: p.client ? { _id: p.client._id, name: p.client.name, phone: p.client.phone } : null,
   };
 }

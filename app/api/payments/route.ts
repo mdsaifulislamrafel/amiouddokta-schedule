@@ -3,19 +3,22 @@ import { connectDB } from "@/lib/db";
 import Payment from "@/models/Payment";
 import Job from "@/models/Job";
 import Client from "@/models/Client";
+import Collector from "@/models/Collector";
 import { createPayment, ensureTokens } from "@/lib/payments";
 
 export async function GET(req: Request) {
   await connectDB();
-  void Client; void Job;
+  void Client; void Job; void Collector;
   const sp = new URL(req.url).searchParams;
   const q: any = {};
   if (sp.get("clientId")) q.client = sp.get("clientId");
   if (sp.get("jobId")) q.job = sp.get("jobId");
   if (sp.get("method")) q.method = sp.get("method");
   if (sp.get("kind")) q.kind = sp.get("kind");
+  if (sp.get("collectorId")) q.collector = sp.get("collectorId") === "none" ? null : sp.get("collectorId");
+  if (sp.get("settle")) q.settle = sp.get("settle");
   if (sp.get("from") || sp.get("to")) q.date = { ...(sp.get("from") && { $gte: sp.get("from") }), ...(sp.get("to") && { $lte: sp.get("to") }) };
-  const list = await Payment.find(q).populate("client", "name phone").populate("job", "serviceType title jobType date").sort({ date: -1, receiptNo: -1 }).limit(1000).lean();
+  const list = await Payment.find(q).populate("client", "name phone").populate("job", "serviceType title jobType date").populate("collector", "name phone designation code").sort({ date: -1, receiptNo: -1 }).limit(1000).lean();
   return NextResponse.json(await ensureTokens(list));
 }
 
@@ -36,9 +39,10 @@ export async function POST(req: Request) {
     if (!client.pkg?.name) return NextResponse.json({ error: "এই ক্লায়েন্টের কোনো প্যাকেজ নেই" }, { status: 400 });
     label = `Package: ${client.pkg.name}`;
   } else label = label || "Advance / Other";
+  if (b.collectorId && !(await Collector.exists({ _id: b.collectorId, active: true }))) return NextResponse.json({ error: "টাকা গ্রহণকারী পাওয়া যায়নি বা বন্ধ আছে" }, { status: 400 });
   const p = await createPayment({
     client: b.clientId, job: b.kind === "job" ? b.jobId : undefined, kind: b.kind || "other", label, amount,
-    method: b.method || "Cash", trxId: b.trxId, date: b.date || new Date().toLocaleDateString("en-CA"), receivedBy: b.receivedBy, note: b.note,
+    method: b.method || "Cash", trxId: b.trxId, date: b.date || new Date().toLocaleDateString("en-CA"), receivedBy: b.receivedBy, collector: b.collectorId || undefined, note: b.note,
   });
   return NextResponse.json(p);
 }

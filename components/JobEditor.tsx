@@ -18,6 +18,8 @@ export default function JobEditor({ id }: { id?: string }) {
   const [msg, setMsg] = useState("");
   const [pkgs, setPkgs] = useState<any[]>([]);
   const [payKey, setPayKey] = useState(0);
+  const [collectors, setCollectors] = useState<any[]>([]);
+  useEffect(() => { fetch("/api/collectors?active=1").then(r => r.json()).then(d => Array.isArray(d) && setCollectors(d)); }, []);
   const [ss, setSs] = useState({ date: today, start: "", end: "", h: "", m: "", note: "" });
   const set = (k: string, v: any) => setF((p: any) => ({ ...p, [k]: v }));
   const load = (j: any) => setF({ ...empty, ...j, jobType: j.jobType || "shoot", deductFrom: j.deductFrom || "hours", clientId: j.client?._id || "", links: (j.driveLinks || []).join("\n"), flinks: (j.footageLinks || []).join("\n") });
@@ -237,7 +239,8 @@ export default function JobEditor({ id }: { id?: string }) {
           {!(f.usePackage && f.deductFrom === "money") && (id
             ? <div><label>জমা হয়েছে / বকেয়া</label><div className="input" style={{ background: "#f3f4f6" }}>{tk(f.paid)} জমা | <b style={{ color: (f.charge || 0) - (f.paid || 0) > 0 ? "#dc2626" : "#059669" }}>{tk((f.charge || 0) - (f.paid || 0))} বকেয়া</b></div></div>
             : <>{field(selPkgId ? "অগ্রিম পেয়েছি (প্যাকেজের মূল্যে জমা হবে)" : "অগ্রিম পেয়েছি (টাকা)", "paid", "number")}
-                {(f.paid || 0) > 0 && <div><label>কিভাবে পেয়েছেন</label><select className="input" value={f.payMethod || "Cash"} onChange={e => set("payMethod", e.target.value)}>{PAY_METHODS.map(m => <option key={m}>{m}</option>)}</select></div>}</>)}
+                {(f.paid || 0) > 0 && <div><label>কিভাবে পেয়েছেন</label><select className="input" value={f.payMethod || "Cash"} onChange={e => set("payMethod", e.target.value)}>{PAY_METHODS.map(m => <option key={m}>{m}</option>)}</select></div>}
+                {(f.paid || 0) > 0 && collectors.length > 0 && <div><label>কার কাছে জমা দিয়েছে</label><select className="input" value={f.payCollector || ""} onChange={e => set("payCollector", e.target.value)}><option value="">সরাসরি অফিসে</option>{collectors.map(c => <option key={c._id} value={c._id}>{c.name} ({c.designation})</option>)}</select></div>}</>)}
           {field("ডেলিভারির সম্ভাব্য তারিখ", "expectedDeliveryDate", "date")}
           {field("ডেলিভারি সময় (যেমন: ৩ কার্যদিবস)", "deliveryEstimate")}
         </div>

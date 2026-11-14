@@ -18,6 +18,10 @@ const PaymentSchema = new Schema({
   trxId: String,                                   // বিকাশ/নগদ/ব্যাংকের ট্রানজেকশন আইডি
   date: { type: String, required: true },          // YYYY-MM-DD
   receivedBy: String,
+  collector: { type: Schema.Types.ObjectId, ref: "Collector" },   // কোন ব্যক্তির কাছে জমা দিয়েছে
+  // গ্রহণকারীর কাছ থেকে অফিসে পৌঁছানোর অবস্থা: holding = তার হাতে, submitted = অফিসে দিয়েছে (যাচাই বাকি), received = অফিস বুঝে নিয়েছে
+  settle: { type: String, enum: ["holding", "submitted", "received"] },
+  handover: { type: Schema.Types.ObjectId, ref: "Handover" },
   note: String,
 }, { timestamps: true });
 

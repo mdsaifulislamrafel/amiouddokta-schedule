@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import ClientPicker from "@/components/ClientPicker";
-import { PAY_METHODS, tk, receiptNo, waLink } from "@/lib/utils";
+import { PAY_METHODS, tk, receiptNo, waLink, SETTLE_LABEL } from "@/lib/utils";
 import { receiptUrl } from "@/components/ReceiptView";
 
 const METHOD_ICON: Record<string, string> = { Cash: "💵", bKash: "📱", Nagad: "📱", Rocket: "📱", Bank: "🏦", Card: "💳" };
@@ -19,13 +19,15 @@ export default function ReceivePayment({ clientId, jobId, kind, onDone }: { clie
   const [cid, setCid] = useState(clientId || "");
   const [dues, setDues] = useState<any>(null);
   const [target, setTarget] = useState(kind === "package" ? "package" : jobId ? `job:${jobId}` : "");
-  const [f, setF] = useState({ amount: "", method: "Cash", trxId: "", date: today, receivedBy: "", note: "" });
+  const [f, setF] = useState({ amount: "", method: "Cash", trxId: "", date: today, receivedBy: "", collectorId: "", note: "" });
+  const [collectors, setCollectors] = useState<any[]>([]);
   const [msg, setMsg] = useState("");
   const [done, setDone] = useState<any>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { if (!clientId) fetch("/api/clients").then(r => r.json()).then(setClients); }, [clientId]);
   useEffect(() => { if (clientId) setCid(clientId); }, [clientId]);
+  useEffect(() => { fetch("/api/collectors?active=1").then(r => r.json()).then(d => Array.isArray(d) && setCollectors(d)); }, []);
   const loadDues = () => cid ? fetch(`/api/dues?clientId=${cid}`).then(r => r.json()).then(setDues) : setDues(null);
   useEffect(() => { loadDues(); }, [cid]);
   useEffect(() => { if (kind === "package") setTarget("package"); else if (jobId) setTarget(`job:${jobId}`); }, [jobId, kind]);
@@ -77,7 +79,12 @@ export default function ReceivePayment({ clientId, jobId, kind, onDone }: { clie
           </div>
           <div className="grid" style={{ marginTop: 10 }}>
             {f.method !== "Cash" && <div><label>Transaction ID / রেফারেন্স</label><input className="input" value={f.trxId} onChange={e => set("trxId", e.target.value)} /></div>}
-            <div><label>কে গ্রহণ করেছেন</label><input className="input" value={f.receivedBy} onChange={e => set("receivedBy", e.target.value)} /></div>
+            {collectors.length > 0 && <div><label>কার কাছে জমা দিয়েছে</label>
+              <select className="input" value={f.collectorId} onChange={e => set("collectorId", e.target.value)}>
+                <option value="">সরাসরি অফিসে</option>
+                {collectors.map(c => <option key={c._id} value={c._id}>{c.name} ({c.designation}) • হাতে {tk(c.stats?.holding)}</option>)}
+              </select></div>}
+            {!f.collectorId && <div><label>কে গ্রহণ করেছেন</label><input className="input" value={f.receivedBy} onChange={e => set("receivedBy", e.target.value)} /></div>}
             <div><label>নোট (ঐচ্ছিক)</label><input className="input" value={f.note} onChange={e => set("note", e.target.value)} /></div>
           </div>
           <div className="row" style={{ marginTop: 12 }}>
@@ -87,6 +94,7 @@ export default function ReceivePayment({ clientId, jobId, kind, onDone }: { clie
           {done && (
             <div className="pay-ok">
               ✅ <b>{tk(done.amount)}</b> জমা হয়েছে — রশিদ নং <b>{receiptNo(done.receiptNo)}</b>{done.due != null && <> | এখন বকেয়া: <b>{tk(done.due)}</b></>}
+              {done.collector && <> | 👤 {done.receivedBy} এর হাতে</>}
               <span className="row" style={{ marginLeft: "auto" }}>
                 <Link className="btn gray" href={`/print/receipt/${done._id}`} target="_blank">🖨 রশিদ প্রিন্ট</Link>
                 {client?.phone && <a className="btn wa" href={waLink(client.phone, receiptText({ ...done, client }))} target="_blank" rel="noreferrer">WhatsApp এ পাঠান</a>}
@@ -114,7 +122,7 @@ export function PaymentList({ query, reloadKey, onChange, showClient }: { query:
   return (
     <div style={{ overflowX: "auto" }}>
       <table>
-        <thead><tr><th>রশিদ</th><th>তারিখ</th>{showClient && <th>ক্লায়েন্ট</th>}<th>বাবদ</th><th>মাধ্যম</th><th style={{ textAlign: "right" }}>টাকা</th><th></th></tr></thead>
+        <thead><tr><th>রশিদ</th><th>তারিখ</th>{showClient && <th>ক্লায়েন্ট</th>}<th>বাবদ</th><th>মাধ্যম</th><th>গ্রহণকারী / অফিস</th><th style={{ textAlign: "right" }}>টাকা</th><th></th></tr></thead>
         <tbody>
           {list.map(p => (
             <tr key={p._id}>
@@ -122,14 +130,15 @@ export function PaymentList({ query, reloadKey, onChange, showClient }: { query:
               {showClient && <td>{p.client ? <Link href={`/clients/${p.client._id}`}>{p.client.name}</Link> : "-"}<br /><small>{p.client?.phone}</small></td>}
               <td>{p.kind === "package" ? "📦 " : p.kind === "other" ? "• " : ""}{p.label}{p.note && <><br /><small>{p.note}</small></>}</td>
               <td>{p.method}{p.trxId && <><br /><small>{p.trxId}</small></>}</td>
+              <td>{p.collector?.name ? <><Link href={`/collectors/${p.collector._id}`}>{p.collector.name}</Link> <small>({p.collector.designation})</small><br /><span className={`badge s-${p.settle}`}>{SETTLE_LABEL[p.settle] || "-"}</span></> : <><small>{p.receivedBy || "সরাসরি অফিসে"}</small></>}</td>
               <td style={{ textAlign: "right" }}><b>{tk(p.amount)}</b></td>
               <td style={{ whiteSpace: "nowrap" }}><Link href={`/print/receipt/${p._id}`} target="_blank">রশিদ</Link>
                 {p.client?.phone && p.token && <> | <a href={waLink(p.client.phone, receiptText(p))} target="_blank" rel="noreferrer" style={{ color: "#16a34a" }}>WhatsApp</a></>}
                 {p.token && <> | <a href="#" onClick={e => { e.preventDefault(); navigator.clipboard?.writeText(receiptUrl(p.token)); alert("লিংক কপি হয়েছে:\n" + receiptUrl(p.token)); }}>লিংক</a></>} | <a href="#" style={{ color: "#dc2626" }} onClick={e => { e.preventDefault(); del(p); }}>মুছুন</a></td>
             </tr>
           ))}
-          {!list.length && <tr><td colSpan={showClient ? 7 : 6}>কোনো জমা নেই</td></tr>}
-          {list.length > 0 && <tr><td colSpan={showClient ? 5 : 4} style={{ textAlign: "right" }}><b>মোট</b></td><td style={{ textAlign: "right" }}><b>{tk(total)}</b></td><td></td></tr>}
+          {!list.length && <tr><td colSpan={showClient ? 8 : 7}>কোনো জমা নেই</td></tr>}
+          {list.length > 0 && <tr><td colSpan={showClient ? 6 : 5} style={{ textAlign: "right" }}><b>মোট</b></td><td style={{ textAlign: "right" }}><b>{tk(total)}</b></td><td></td></tr>}
         </tbody>
       </table>
     </div>

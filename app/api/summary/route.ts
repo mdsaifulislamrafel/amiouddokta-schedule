@@ -13,11 +13,12 @@ export async function GET() {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: tz });
   const month = today.slice(0, 7);
   const in7 = new Date(Date.now() + 7 * 864e5).toLocaleDateString("en-CA", { timeZone: tz });
-  const [todayP, monthP, jobs, members] = await Promise.all([
+  const [todayP, monthP, jobs, members, unsettled] = await Promise.all([
     Payment.find({ date: today }).select("amount").lean(),
     Payment.find({ date: { $gte: month + "-01", $lte: month + "-31" } }).select("amount method").lean(),
     Job.find({ status: { $ne: "rejected" }, $nor: [{ usePackage: true, deductFrom: "money" }] }).select("charge paid").lean(),
     Client.find({ isMember: true }).select("name phone pkg").lean(),
+    Payment.find({ settle: { $in: ["holding", "submitted"] } }).select("amount settle").lean(),
   ]);
   const sum = (a: any[]) => a.reduce((s, x) => s + (x.amount || 0), 0);
   const byMethod: Record<string, number> = {};
@@ -27,5 +28,7 @@ export async function GET() {
   const expiring = (members as any[]).filter(c => c.pkg?.endDate && c.pkg.endDate <= in7)
     .map(c => ({ _id: c._id, name: c.name, phone: c.phone, pkg: c.pkg.name, endDate: c.pkg.endDate, expired: c.pkg.endDate < today }))
     .sort((a, b) => a.endDate.localeCompare(b.endDate));
-  return NextResponse.json({ today, todayTotal: sum(todayP), monthTotal: sum(monthP), byMethod, totalDue: jobDue + pkgDue, expiring });
+  const inHand = sum((unsettled as any[]).filter(p => p.settle === "holding"));
+  const pendingVerify = sum((unsettled as any[]).filter(p => p.settle === "submitted"));
+  return NextResponse.json({ today, todayTotal: sum(todayP), monthTotal: sum(monthP), byMethod, totalDue: jobDue + pkgDue, expiring, inHand, pendingVerify });
 }

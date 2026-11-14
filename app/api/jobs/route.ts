@@ -45,9 +45,9 @@ export async function POST(req: Request) {
   const pkgAdvance = data.packageId && Number(b.paid) > 0 ? Number(b.paid) : 0;
   if (pkgAdvance) data.paid = 0;
   const job = await new Job(data).save();
-  if (pkgAdvance) await createPayment({ client: clientId, job: job._id, kind: "package", label: `Package: ${data.packageName}`, amount: pkgAdvance, method: b.payMethod || "Cash", date: new Date().toLocaleDateString("en-CA"), note: "Advance" });
+  if (pkgAdvance) await createPayment({ client: clientId, job: job._id, kind: "package", label: `Package: ${data.packageName}`, amount: pkgAdvance, method: b.payMethod || "Cash", date: new Date().toLocaleDateString("en-CA"), collector: b.payCollector || undefined, note: "Advance" });
   // কাজ তৈরির সময় অগ্রিম নিলে রশিদ রেকর্ড
   if (job.paid > 0 && !(job.usePackage && job.deductFrom === "money"))
-    await createPayment({ client: clientId, job: job._id, kind: "job", label: `${job.serviceType}${job.title ? " — " + job.title : ""} (${job.date})`, amount: job.paid, method: b.payMethod || "Cash", date: new Date().toLocaleDateString("en-CA"), note: "Advance" }, false);
+    await createPayment({ client: clientId, job: job._id, kind: "job", label: `${job.serviceType}${job.title ? " — " + job.title : ""} (${job.date})`, amount: job.paid, method: b.payMethod || "Cash", date: new Date().toLocaleDateString("en-CA"), collector: b.payCollector || undefined, note: "Advance" }, false);
   return NextResponse.json(job);
 }

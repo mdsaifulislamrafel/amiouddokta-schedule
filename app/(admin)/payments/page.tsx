@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import ReceivePayment, { PaymentList } from "@/components/ReceivePayment";
-import { tk, waLink, PAY_METHODS } from "@/lib/utils";
+import { tk, waLink, PAY_METHODS, SETTLE_LABEL } from "@/lib/utils";
 
 // টাকা জমা — কালেকশন সারসংক্ষেপ, নতুন জমা, রশিদের তালিকা, বকেয়ার তালিকা
 export default function Payments() {
@@ -11,10 +11,11 @@ export default function Payments() {
   const [sum, setSum] = useState<any>(null);
   const [dues, setDues] = useState<any>(null);
   const [key, setKey] = useState(0);
-  const [flt, setFlt] = useState({ from: today.slice(0, 8) + "01", to: today, method: "" });
+  const [flt, setFlt] = useState({ from: today.slice(0, 8) + "01", to: today, method: "", collectorId: "", settle: "" });
+  const [collectors, setCollectors] = useState<any[]>([]);
   const [preset, setPreset] = useState<{ clientId?: string; jobId?: string; kind?: any }>({});
   const reload = () => { setKey(k => k + 1); fetch("/api/summary").then(r => r.json()).then(setSum); fetch("/api/dues").then(r => r.json()).then(setDues); };
-  useEffect(() => { const t = new URLSearchParams(location.search).get("tab"); if (t) setTab(t); reload(); }, []);
+  useEffect(() => { const t = new URLSearchParams(location.search).get("tab"); if (t) setTab(t); reload(); fetch("/api/collectors").then(r => r.json()).then(d => Array.isArray(d) && setCollectors(d)); }, []);
   const q = new URLSearchParams(Object.entries(flt).filter(([, v]) => v) as any).toString();
   const receive = (clientId: string, jobId?: string, kind?: string) => { setPreset({ clientId, jobId, kind }); setTab("receive"); window.scrollTo(0, 0); };
 
@@ -25,6 +26,8 @@ export default function Payments() {
         <div className="stat-card"><small>এই মাসের কালেকশন</small><div className="stat">{tk(sum?.monthTotal)}</div>
           <small>{sum && Object.entries(sum.byMethod).map(([m, v]: any) => `${m}: ${tk(v)}`).join(" • ")}</small></div>
         <div className="stat-card red" style={{ cursor: "pointer" }} onClick={() => setTab("dues")}><small>মোট বকেয়া</small><div className="stat">{tk(sum?.totalDue)}</div></div>
+        <Link href="/collectors" className="stat-card amber"><small>গ্রহণকারীদের হাতে (অফিসে আসেনি)</small><div className="stat">{tk(sum?.inHand)}</div>
+          {(sum?.pendingVerify || 0) > 0 && <small>অফিসের যাচাই বাকি: {tk(sum.pendingVerify)}</small>}</Link>
       </div>
       <div className="card">
         <div className="tabs">
@@ -44,6 +47,8 @@ export default function Payments() {
               <label>থেকে <input type="date" className="input" value={flt.from} onChange={e => setFlt({ ...flt, from: e.target.value })} /></label>
               <label>পর্যন্ত <input type="date" className="input" value={flt.to} onChange={e => setFlt({ ...flt, to: e.target.value })} /></label>
               <label>মাধ্যম <select className="input" value={flt.method} onChange={e => setFlt({ ...flt, method: e.target.value })}><option value="">সব</option>{PAY_METHODS.map(m => <option key={m}>{m}</option>)}</select></label>
+              <label>গ্রহণকারী <select className="input" value={flt.collectorId} onChange={e => setFlt({ ...flt, collectorId: e.target.value })}><option value="">সব</option><option value="none">সরাসরি অফিসে</option>{collectors.map(c => <option key={c._id} value={c._id}>{c.name} ({c.designation})</option>)}</select></label>
+              <label>অবস্থা <select className="input" value={flt.settle} onChange={e => setFlt({ ...flt, settle: e.target.value })}><option value="">সব</option>{Object.entries(SETTLE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
               <button className="btn gray" onClick={() => setFlt({ ...flt, from: today, to: today })}>আজ</button>
               <button className="btn gray" onClick={() => setFlt({ ...flt, from: today.slice(0, 8) + "01", to: today })}>এই মাস</button>
             </div>
