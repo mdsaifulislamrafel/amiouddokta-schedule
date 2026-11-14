@@ -40,3 +40,12 @@ export function pkgSummary(d: any, month: string) {
   const credit = p.credit || 0, moneyUsed = d?.moneyUsed || 0;
   return { allowed, used, left: Math.max(0, allowed - used), over: allowed > 0 && used > allowed ? used - allowed : 0, total, credit, moneyUsed, moneyLeft: credit - moneyUsed, periodText: total ? "পুরো মেয়াদে" : `${month} মাসে` };
 }
+export const tk = (n?: number) => "৳" + Math.round(n || 0).toLocaleString("en-IN");
+export const receiptNo = (n?: number) => "MR-" + String(n || 0).padStart(5, "0");
+// WhatsApp এ মেসেজ পাঠানোর লিংক (বাংলাদেশি নাম্বার 01XXXXXXXXX → 8801XXXXXXXXX)
+export function waLink(phone: string | undefined, text: string) {
+  let n = (phone || "").replace(/\D/g, "");
+  if (n.startsWith("0")) n = "88" + n;
+  return `https://wa.me/${n}?text=${encodeURIComponent(text)}`;
+}
+export const PAY_METHODS = ["Cash", "bKash", "Nagad", "Rocket", "Bank", "Card"];

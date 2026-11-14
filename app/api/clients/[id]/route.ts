@@ -36,6 +36,13 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 }
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   await connectDB();
-  try { return NextResponse.json(await Client.findByIdAndUpdate(params.id, await req.json(), { new: true })); }
+  const b = await req.json();
+  // প্যাকেজের paid শুধু রশিদ থেকে বদলায়; নতুন প্যাকেজ দিলে 0 থেকে শুরু
+  if (b.pkg) {
+    const old: any = await Client.findById(params.id).select("pkg").lean();
+    const changed = b.pkg.packageId && String(b.pkg.packageId) !== String(old?.pkg?.packageId || "");
+    b.pkg.paid = changed ? 0 : old?.pkg?.paid || 0;
+  }
+  try { return NextResponse.json(await Client.findByIdAndUpdate(params.id, b, { new: true })); }
   catch (e: any) { return NextResponse.json({ error: e.code === 11000 ? "এই নাম্বার অন্য ক্লায়েন্টের" : e.message }, { status: 400 }); }
 }

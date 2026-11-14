@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { fmtDur, fmt12, statusLabel, billingLabel, pkgSummary, addMonths } from "@/lib/utils";
+import { fmtDur, fmt12, statusLabel, billingLabel, pkgSummary, addMonths, tk } from "@/lib/utils";
+import ReceivePayment, { PaymentList } from "@/components/ReceivePayment";
 
 const lines = (t: string) => (t || "").split("\n").map(s => s.trim()).filter(Boolean);
 
@@ -13,6 +14,7 @@ export default function ClientPage({ params }: { params: { id: string } }) {
   const [msg, setMsg] = useState(""); const [smsg, setSmsg] = useState("");
   const [month, setMonth] = useState(today.slice(0, 7));
   const [onlyMonth, setOnlyMonth] = useState(false);
+  const [payKey, setPayKey] = useState(0);
   const [sf, setSf] = useState({ jobId: "", date: today, start: "", end: "", note: "" });
   const load = () => fetch(`/api/clients/${params.id}`).then(r => r.json()).then(x => {
     const p = x.client.pkg || {};
@@ -88,7 +90,7 @@ export default function ClientPage({ params }: { params: { id: string } }) {
             <div className="grid">
               <div><label>প্যাকেজের নাম</label><input className="input" value={c.pkg.name || ""} onChange={e => setP("name", e.target.value)} /></div>
               <div><label>প্যাকেজ মূল্য (টাকা)</label><input type="number" className="input" value={c.pkg.price || ""} onChange={e => setP("price", Number(e.target.value))} /></div>
-              <div><label>প্যাকেজের টাকা পেয়েছি</label><input type="number" className="input" value={c.pkg.paid || ""} onChange={e => setP("paid", Number(e.target.value))} /></div>
+              <div><label>প্যাকেজের টাকা পেয়েছি (রশিদ থেকে)</label><div className="input" style={{ background: "#f3f4f6" }}>{tk(saved.paid)} | বকেয়া {tk((saved.price || 0) - (saved.paid || 0))} — <a href="#pay">টাকা নিন ↓</a></div></div>
               <div><label>মোট ঘন্টা</label><input type="number" className="input" value={c.pkg.monthlyHours || ""} onChange={e => setP("monthlyHours", Number(e.target.value))} /></div>
               <div><label>ঘন্টার হিসাব</label><select className="input" value={c.pkg.hoursPeriod || "month"} onChange={e => setP("hoursPeriod", e.target.value)}><option value="month">প্রতি মাসে</option><option value="total">পুরো মেয়াদে মোট</option></select></div>
               <div><label>টাকার ব্যালেন্স (অন্য কাজে খরচযোগ্য)</label><input type="number" className="input" value={c.pkg.credit || ""} onChange={e => setP("credit", Number(e.target.value))} /></div>
@@ -160,13 +162,21 @@ export default function ClientPage({ params }: { params: { id: string } }) {
         </table>
       </div>
 
+      <div className="card" id="pay">
+        <h3>💰 টাকা জমা নিন</h3>
+        <ReceivePayment clientId={params.id} onDone={() => { setPayKey(k => k + 1); load(); }} />
+        <h4 style={{ marginBottom: 4 }}>জমার ইতিহাস (মানি রিসিট)</h4>
+        <PaymentList query={`clientId=${params.id}`} reloadKey={payKey} onChange={load} />
+      </div>
+
       <div className="card">
         <h3>সব কাজ (ডিল)</h3>
         <table>
-          <thead><tr><th>শুরুর তারিখ</th><th>সার্ভিস</th><th>স্ট্যাটাস</th><th>মোট সময়</th><th>ধরন</th><th>চার্জ</th><th></th></tr></thead>
+          <thead><tr><th>শুরুর তারিখ</th><th>সার্ভিস</th><th>স্ট্যাটাস</th><th>মোট সময়</th><th>ধরন</th><th>চার্জ</th><th>জমা / বকেয়া</th><th></th></tr></thead>
           <tbody>{d.jobs.map((j: any) => (
             <tr key={j._id}><td>{j.date}</td><td>{j.jobType === "edit" && <span className="badge edit">✂ এডিট</span>} {j.serviceType}</td><td><span className={`badge ${j.status}`}>{statusLabel(j.status, j.jobType)}</span></td><td>{fmtDur(j.durationMinutes || 0)}</td>
-              <td>{billingLabel(j)}</td><td>{j.charge}</td><td><Link href={`/jobs/${j._id}`}>খুলুন</Link></td></tr>))}</tbody>
+              <td>{billingLabel(j)}{j.packageName && <><br /><small>📦 {j.packageName}</small></>}</td><td>{j.charge}</td>
+              <td>{j.usePackage && j.deductFrom === "money" ? "-" : <>{tk(j.paid)} / <b style={{ color: (j.charge || 0) - (j.paid || 0) > 0 ? "#dc2626" : "#059669" }}>{tk((j.charge || 0) - (j.paid || 0))}</b></>}</td><td><Link href={`/jobs/${j._id}`}>খুলুন</Link></td></tr>))}</tbody>
         </table>
       </div>
     </>

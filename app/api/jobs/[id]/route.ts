@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Job from "@/models/Job";
 import Client from "@/models/Client";
+import Payment from "@/models/Payment";
 import { calcMinutes, sumMinutes } from "@/lib/utils";
 import { FIELDS } from "@/lib/jobFields";
 import { findConflict, conflictMessage } from "@/lib/conflict";
+import { assignPackage } from "@/lib/packages";
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   await connectDB();
@@ -26,8 +28,12 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   const b = await req.json();
   const job: any = await Job.findById(params.id);
   if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  FIELDS.forEach(k => b[k] !== undefined && (job[k] = b[k]));
+  FIELDS.forEach(k => k !== "paid" && b[k] !== undefined && (job[k] = b[k])); // paid শুধু টাকা জমার রশিদ থেকে বদলায়
   if (b.clientId) job.client = b.clientId;
+  if (b.assignPackageId) {
+    const t = await assignPackage(job.client, b.assignPackageId, job.date);
+    if (t) { job.packageId = t._id; job.packageName = t.name; job.usePackage = true; }
+  }
   job.durationMinutes = sumMinutes(job.sessions);
   const a = b.action;
 
@@ -60,5 +66,6 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
   const j: any = await Job.findById(params.id);
   if (!j) return NextResponse.json({ error: "Not found" }, { status: 404 });
   await Job.findByIdAndDelete(params.id);
+  await Payment.updateMany({ job: params.id }, { $set: { kind: "other" }, $unset: { job: 1 } }); // রশিদ থেকে যাবে
   return NextResponse.json({ ok: true });
 }

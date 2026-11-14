@@ -1,71 +1,12 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import ClientPicker from "@/components/ClientPicker";
+import ReceivePayment, { PaymentList } from "@/components/ReceivePayment";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { SERVICES, EDIT_SERVICES, FOOTAGE_SOURCE, calcMinutes, fmtDur, fmt12, statusLabel, pkgSummary } from "@/lib/utils";
+import { SERVICES, EDIT_SERVICES, FOOTAGE_SOURCE, calcMinutes, fmtDur, fmt12, statusLabel, pkgSummary, tk, waLink, PAY_METHODS } from "@/lib/utils";
 
 const empty: any = { jobType: "shoot", footageSource: "client_self", flinks: "", footageNote: "", deductFrom: "hours", clientId: "", newName: "", newPhone: "", deliveryPhone: "", serviceType: SERVICES[0], title: "", date: "", startTime: "", endTime: "", assignedTo: "", location: "Office", charge: 0, paid: 0, usePackage: false, expectedDeliveryDate: "", deliveryEstimate: "", links: "", deliveryNote: "", optionalNote: "", status: "pending", sessions: [] };
-
-// টাইপ করে সার্চ করা যায় এমন ক্লায়েন্ট সিলেক্টর
-function ClientPicker({ clients, value, onChange }: { clients: any[]; value: string; onChange: (id: string) => void }) {
-  const [q, setQ] = useState("");
-  const [open, setOpen] = useState(false);
-  const [hi, setHi] = useState(0);
-  const ref = useRef<HTMLDivElement>(null);
-
-  const selected = clients.find(c => c._id === value);
-  const label = (c: any) => `${c.name} (${c.phone})${c.isMember ? " ★ Member" : ""}`;
-
-  // বাইরে ক্লিক করলে লিস্ট বন্ধ
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
-
-  const term = q.trim().toLowerCase();
-  const list = (term
-    ? clients.filter(c => (c.name || "").toLowerCase().includes(term) || (c.phone || "").includes(term))
-    : clients
-  ).slice(0, 50);
-
-  const pick = (c: any) => { onChange(c._id); setQ(""); setOpen(false); };
-
-  function onKey(e: React.KeyboardEvent) {
-    if (e.key === "ArrowDown") { e.preventDefault(); setOpen(true); setHi(h => Math.min(h + 1, list.length - 1)); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); setHi(h => Math.max(h - 1, 0)); }
-    else if (e.key === "Enter") { if (open && list[hi]) { e.preventDefault(); pick(list[hi]); } }
-    else if (e.key === "Escape") setOpen(false);
-  }
-
-  return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <input
-        className="input"
-        placeholder="-- নাম বা ফোন নাম্বার টাইপ করুন --"
-        value={open ? q : (selected ? label(selected) : "")}
-        onFocus={() => { setOpen(true); setQ(""); setHi(0); }}
-        onChange={e => { setQ(e.target.value); setOpen(true); setHi(0); }}
-        onKeyDown={onKey}
-      />
-      {value && (
-        <button type="button" onClick={() => { onChange(""); setQ(""); }} title="মুছুন"
-          style={{ position: "absolute", right: 8, top: 6, border: 0, background: "transparent", cursor: "pointer", fontSize: 16 }}>✕</button>
-      )}
-      {open && (
-        <div style={{ position: "absolute", zIndex: 50, left: 0, right: 0, maxHeight: 260, overflowY: "auto", background: "#fff", border: "1px solid #d1d5db", borderRadius: 6, boxShadow: "0 4px 12px rgba(0,0,0,.12)", marginTop: 2 }}>
-          {list.map((c, i) => (
-            <div key={c._id} onMouseDown={e => { e.preventDefault(); pick(c); }} onMouseEnter={() => setHi(i)}
-              style={{ padding: "8px 10px", cursor: "pointer", background: i === hi ? "#eef2ff" : "#fff", fontWeight: c._id === value ? 700 : 400 }}>
-              {label(c)}
-            </div>
-          ))}
-          {!list.length && <div style={{ padding: "8px 10px", color: "#6b7280" }}>কোনো ক্লায়েন্ট পাওয়া যায়নি</div>}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function JobEditor({ id }: { id?: string }) {
   const router = useRouter();
@@ -75,6 +16,8 @@ export default function JobEditor({ id }: { id?: string }) {
   const [cd, setCd] = useState<any>(null); // নির্বাচিত ক্লায়েন্টের আগের ডেটা
   const [isNew, setIsNew] = useState(false);
   const [msg, setMsg] = useState("");
+  const [pkgs, setPkgs] = useState<any[]>([]);
+  const [payKey, setPayKey] = useState(0);
   const [ss, setSs] = useState({ date: today, start: "", end: "", h: "", m: "", note: "" });
   const set = (k: string, v: any) => setF((p: any) => ({ ...p, [k]: v }));
   const load = (j: any) => setF({ ...empty, ...j, jobType: j.jobType || "shoot", deductFrom: j.deductFrom || "hours", clientId: j.client?._id || "", links: (j.driveLinks || []).join("\n"), flinks: (j.footageLinks || []).join("\n") });
@@ -82,6 +25,7 @@ export default function JobEditor({ id }: { id?: string }) {
 
   useEffect(() => {
     fetch("/api/clients").then(r => r.json()).then(setClients);
+    fetch("/api/packages?active=1").then(r => r.json()).then(d => Array.isArray(d) && setPkgs(d));
     if (id) fetch(`/api/jobs/${id}`).then(r => r.json()).then(load);
     else {
       const sp = new URLSearchParams(location.search);
@@ -94,6 +38,18 @@ export default function JobEditor({ id }: { id?: string }) {
 
   const isEdit = f.jobType === "edit";
   const services = isEdit ? EDIT_SERVICES : SERVICES;
+  const selPkgId: string = f.assignPackageId || (f.packageId?._id ?? f.packageId) || "";
+  // সার্ভিস বা প্যাকেজ বাছাই — সার্ভিসের লিস্ট আগের মতোই, পাশাপাশি প্যাকেজ
+  function pickService(v: string) {
+    if (v.startsWith("pkg:")) {
+      const t = pkgs.find(p => p._id === v.slice(4));
+      if (!t) return;
+      return setF((p: any) => ({ ...p, _other: false, assignPackageId: t._id, packageName: t.name, usePackage: true, deductFrom: "hours", serviceType: t.serviceType || t.name }));
+    }
+    const base = { assignPackageId: "", packageId: null, packageName: "" };
+    if (v === "__other") setF((p: any) => ({ ...p, ...base, _other: true, serviceType: "" }));
+    else setF((p: any) => ({ ...p, ...base, _other: false, serviceType: v }));
+  }
   function setType(t: string) {
     setF((p: any) => ({ ...p, jobType: t, _other: false, serviceType: (t === "edit" ? EDIT_SERVICES : SERVICES)[0], location: t === "edit" ? "" : p.location || "Office" }));
   }
@@ -211,12 +167,17 @@ export default function JobEditor({ id }: { id?: string }) {
         <div className="grid">
           <div>
             <label>সার্ভিস</label>
-            <select className="input" value={services.includes(f.serviceType) && !f._other ? f.serviceType : "__other"}
-              onChange={e => e.target.value === "__other" ? setF((p: any) => ({ ...p, _other: true, serviceType: "" })) : setF((p: any) => ({ ...p, _other: false, serviceType: e.target.value }))}>
-              {services.map(s => <option key={s}>{s}</option>)}
-              <option value="__other">অন্যান্য (নিজে লিখুন)</option>
+            <select className="input" value={selPkgId ? `pkg:${selPkgId}` : services.includes(f.serviceType) && !f._other ? f.serviceType : "__other"} onChange={e => pickService(e.target.value)}>
+              <optgroup label={isEdit ? "এডিট সার্ভিস" : "সার্ভিস"}>
+                {services.map(s => <option key={s}>{s}</option>)}
+                <option value="__other">অন্যান্য (নিজে লিখুন)</option>
+              </optgroup>
+              {pkgs.length > 0 && <optgroup label="📦 প্যাকেজ (ক্লায়েন্ট প্যাকেজে যেতে চাইলে)">
+                {pkgs.map(p => <option key={p._id} value={`pkg:${p._id}`}>📦 {p.name} — {tk(p.price)}</option>)}
+              </optgroup>}
+              {selPkgId && !pkgs.some(p => p._id === selPkgId) && <option value={`pkg:${selPkgId}`}>📦 {f.packageName}</option>}
             </select>
-            {(!services.includes(f.serviceType) || f._other) && <input className="input" style={{ marginTop: 6 }} placeholder="সার্ভিসের নাম লিখুন" value={f.serviceType} onChange={e => set("serviceType", e.target.value)} />}
+            {!selPkgId && (!services.includes(f.serviceType) || f._other) && <input className="input" style={{ marginTop: 6 }} placeholder="সার্ভিসের নাম লিখুন" value={f.serviceType} onChange={e => set("serviceType", e.target.value)} />}
           </div>
           {field("শিরোনাম / বিবরণ", "title")}
           {isEdit ? (
@@ -247,20 +208,43 @@ export default function JobEditor({ id }: { id?: string }) {
           </>
         )}
         {!isEdit && planned != null && <p>পরিকল্পিত সময়: <b>{fmtDur(planned)}</b></p>}
+        {selPkgId && (() => {
+          const t = pkgs.find(p => p._id === selPkgId);
+          const already = cd?.client?.isMember && String(cd.client.pkg?.packageId || "") === selPkgId;
+          return (
+            <div className="pkg-box">
+              <b>📦 প্যাকেজ: {t?.name || f.packageName}</b>
+              {t && <> — মূল্য {tk(t.price)} | {t.hours ? `${t.hours} ঘন্টা ${t.hoursPeriod === "total" ? "(পুরো মেয়াদে)" : "প্রতি মাসে"}` : "ঘন্টা নেই"}{t.credit ? ` | টাকার ব্যালেন্স ${tk(t.credit)}` : ""} | মেয়াদ {t.durationMonths || 1} মাস</>}
+              {t?.features?.length > 0 && <ul style={{ margin: "6px 0" }}>{t.features.map((x: string, i: number) => <li key={i}>{x}</li>)}</ul>}
+              <div style={{ fontSize: 13 }}>
+                {f.assignPackageId
+                  ? already ? "✔ ক্লায়েন্টের এই প্যাকেজ আগে থেকেই চালু আছে — এই কাজ সেই প্যাকেজ থেকে কাটবে।"
+                    : cd?.client?.isMember ? `⚠ সেভ করলে ক্লায়েন্টের বর্তমান প্যাকেজ (${cd.client.pkg?.name}) বদলে এই প্যাকেজ চালু হবে, আগের কাজের হিসাব থাকবে।`
+                    : "সেভ করলে ক্লায়েন্টকে এই প্যাকেজ দেওয়া হবে (মেয়াদ কাজের তারিখ থেকে) — এরপর ঘন্টা/টাকার হিসাব ক্লায়েন্ট ফাইলে চলবে।"
+                  : "এই কাজটি এই প্যাকেজের আওতায় নেওয়া হয়েছে।"}
+                {!id && " এখানে দেওয়া অগ্রিম টাকা প্যাকেজের মূল্যে জমা হবে।"}
+              </div>
+              {cd?.client?._id && <Link href={`/print/package/${cd.client._id}`} target="_blank">প্যাকেজ Agreement দেখুন →</Link>}
+            </div>
+          );
+        })()}
       </div>
 
       <div className="card">
         <h3>চার্জ ও ডেলিভারি সময়</h3>
         <div className="grid">
           {field(f.usePackage && f.deductFrom === "money" ? "চার্জ (টাকা) — প্যাকেজের ব্যালেন্স থেকে কাটবে" : "মোট চার্জ (টাকা)", "charge", "number")}
-          {!(f.usePackage && f.deductFrom === "money") && field("পেমেন্ট পেয়েছি (টাকা)", "paid", "number")}
+          {!(f.usePackage && f.deductFrom === "money") && (id
+            ? <div><label>জমা হয়েছে / বকেয়া</label><div className="input" style={{ background: "#f3f4f6" }}>{tk(f.paid)} জমা | <b style={{ color: (f.charge || 0) - (f.paid || 0) > 0 ? "#dc2626" : "#059669" }}>{tk((f.charge || 0) - (f.paid || 0))} বকেয়া</b></div></div>
+            : <>{field(selPkgId ? "অগ্রিম পেয়েছি (প্যাকেজের মূল্যে জমা হবে)" : "অগ্রিম পেয়েছি (টাকা)", "paid", "number")}
+                {(f.paid || 0) > 0 && <div><label>কিভাবে পেয়েছেন</label><select className="input" value={f.payMethod || "Cash"} onChange={e => set("payMethod", e.target.value)}>{PAY_METHODS.map(m => <option key={m}>{m}</option>)}</select></div>}</>)}
           {field("ডেলিভারির সম্ভাব্য তারিখ", "expectedDeliveryDate", "date")}
           {field("ডেলিভারি সময় (যেমন: ৩ কার্যদিবস)", "deliveryEstimate")}
         </div>
         <label style={{ marginTop: 10 }}><input type="checkbox" checked={!!f.usePackage} onChange={e => set("usePackage", e.target.checked)} /> এই কাজ Member প্যাকেজ থেকে কাটবে (না টিক দিলে আলাদা / এক্সট্রা সার্ভিস হিসেবে চার্জ হবে)</label>
         {f.usePackage && (
           <div style={{ marginLeft: 22 }}>
-            {cd?.client && !member && <p style={{ color: "#dc2626", margin: "4px 0" }}>⚠ এই ক্লায়েন্টের কোনো প্যাকেজ নেই। ক্লায়েন্ট ফাইলে গিয়ে প্যাকেজ দিন।</p>}
+            {cd?.client && !member && <p style={{ color: "#dc2626", margin: "4px 0" }}>⚠ এই ক্লায়েন্টের কোনো প্যাকেজ নেই। উপরের সার্ভিস থেকে একটি 📦 প্যাকেজ বাছাই করুন অথবা ক্লায়েন্ট ফাইলে গিয়ে প্যাকেজ দিন।</p>}
             <label style={{ fontWeight: 400 }}><input type="radio" checked={f.deductFrom !== "money"} onChange={() => set("deductFrom", "hours")} /> প্যাকেজের <b>ঘন্টা</b> থেকে কাটবে — {workWord} সেশনের মোট সময় কাটা হবে{member && <> (বাকি: {fmtDur(ps.left)})</>}</label>
             <label style={{ fontWeight: 400 }}><input type="radio" checked={f.deductFrom === "money"} onChange={() => set("deductFrom", "money")} /> প্যাকেজের <b>টাকা</b> থেকে কাটবে — উপরের চার্জ ব্যালেন্স থেকে কাটা হবে{member && <> (বাকি: {ps.moneyLeft} টাকা)</>}</label>
             {member && f.deductFrom === "money" && (f.charge || 0) > ps.moneyLeft + (id && cd?.moneyJobs?.some((j: any) => j._id === id) ? cd.moneyJobs.find((j: any) => j._id === id).charge || 0 : 0) &&
@@ -298,6 +282,16 @@ export default function JobEditor({ id }: { id?: string }) {
         )}
       </div>
 
+      {id && f.clientId && (
+        <div className="card">
+          <h3>💰 টাকা জমা ও রশিদ</h3>
+          <ReceivePayment clientId={f.clientId} jobId={id} kind={selPkgId && !(f.charge > 0) ? "package" : "job"}
+            onDone={() => { setPayKey(k => k + 1); fetch(`/api/jobs/${id}`).then(r => r.json()).then(j => setF((p: any) => ({ ...p, paid: j.paid }))); loadClient(f.clientId); }} />
+          <h4 style={{ marginBottom: 4 }}>এই ক্লায়েন্টের জমার ইতিহাস</h4>
+          <PaymentList query={`clientId=${f.clientId}`} reloadKey={payKey} onChange={() => fetch(`/api/jobs/${id}`).then(r => r.json()).then(j => setF((p: any) => ({ ...p, paid: j.paid })))} />
+        </div>
+      )}
+
       <div className="card">
         <h3>ডেলিভারি নোট</h3>
         <label>Google Drive লিংক (প্রতি লাইনে একটি)</label>
@@ -306,6 +300,10 @@ export default function JobEditor({ id }: { id?: string }) {
         <textarea className="input" rows={2} value={f.deliveryNote} onChange={e => set("deliveryNote", e.target.value)} />
         <label style={{ marginTop: 10 }}>অতিরিক্ত নোট (ঐচ্ছিক)</label>
         <textarea className="input" rows={2} value={f.optionalNote} onChange={e => set("optionalNote", e.target.value)} />
+        {id && f.links?.trim() && (f.deliveryPhone || cd?.client?.phone) && (
+          <a className="btn wa" style={{ marginTop: 10 }} target="_blank" rel="noreferrer" href={waLink(f.deliveryPhone || cd?.client?.phone,
+            `আসসালামু আলাইকুম ${cd?.client?.name || ""},\nআপনার "${f.serviceType}${f.title ? " — " + f.title : ""}" কাজটি ডেলিভারি দেওয়া হলো:\n${f.links.trim()}${f.deliveryNote ? "\n" + f.deliveryNote : ""}${(f.charge || 0) - (f.paid || 0) > 0 && !(f.usePackage && f.deductFrom === "money") ? `\nবকেয়া: ${tk((f.charge || 0) - (f.paid || 0))}` : ""}\nধন্যবাদ — আমিও উদ্যোক্তা`)}>📲 WhatsApp এ ডেলিভারি লিংক পাঠান</a>
+        )}
       </div>
 
       <div className="row"><button className="btn" onClick={() => send()}>{id ? "সেভ করুন" : "কাজ যোগ করুন"}</button><span>{msg}</span></div>

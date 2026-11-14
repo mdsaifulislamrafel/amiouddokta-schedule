@@ -9,4 +9,4 @@ export async function middleware(req: NextRequest) {
   if (req.nextUrl.pathname.startsWith("/api")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   return NextResponse.redirect(new URL("/login", req.url));
 }
-export const config = { matcher: ["/((?!login|api/auth|api/dashboard|_next|favicon.ico|logo.jpg|watermark.png).*)"] };
+export const config = { matcher: ["/((?!login|api/auth|api/dashboard|api/r/|r/|_next|favicon.ico|logo.jpg|watermark.png).*)"] };

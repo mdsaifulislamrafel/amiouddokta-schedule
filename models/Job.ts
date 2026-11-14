@@ -19,6 +19,7 @@ const JobSchema = new Schema({
   footageLinks: [String],                           // কাঁচা ফুটেজের লিংক
   footageNote: String,                              // ফুটেজ সম্পর্কে / এডিটের নির্দেশনা
   charge: { type: Number, default: 0 }, paid: { type: Number, default: 0 },
+  packageId: { type: Schema.Types.ObjectId, ref: "Package" }, packageName: String, // কোন প্যাকেজ থেকে নেওয়া (ঐচ্ছিক)
   usePackage: { type: Boolean, default: false },    // প্যাকেজ থেকে কাটবে কিনা
   deductFrom: { type: String, enum: ["hours", "money"], default: "hours" }, // প্যাকেজের ঘন্টা নাকি টাকা থেকে
   expectedDeliveryDate: String, deliveryEstimate: String,

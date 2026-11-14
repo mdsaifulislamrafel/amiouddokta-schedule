@@ -4,6 +4,8 @@ import Client from "@/models/Client";
 import Job from "@/models/Job";
 import { FIELDS } from "@/lib/jobFields";
 import { findConflict, conflictMessage } from "@/lib/conflict";
+import { assignPackage } from "@/lib/packages";
+import { createPayment } from "@/lib/payments";
 
 export async function GET(req: Request) {
   await connectDB();
@@ -34,5 +36,18 @@ export async function POST(req: Request) {
   }
   const data: any = { client: clientId };
   FIELDS.forEach(k => b[k] !== undefined && (data[k] = b[k]));
-  return NextResponse.json(await new Job(data).save());
+  // সার্ভিসের জায়গায় প্যাকেজ বাছাই করলে ক্লায়েন্টকে সেই প্যাকেজ দেওয়া হবে, কাজ প্যাকেজের ঘন্টা থেকে কাটবে
+  if (b.assignPackageId) {
+    const t = await assignPackage(clientId, b.assignPackageId, b.date);
+    if (t) Object.assign(data, { packageId: t._id, packageName: t.name, usePackage: true });
+  }
+  // প্যাকেজ নেওয়ার সময় অগ্রিম দিলে সেটা প্যাকেজের মূল্যে জমা হবে
+  const pkgAdvance = data.packageId && Number(b.paid) > 0 ? Number(b.paid) : 0;
+  if (pkgAdvance) data.paid = 0;
+  const job = await new Job(data).save();
+  if (pkgAdvance) await createPayment({ client: clientId, job: job._id, kind: "package", label: `Package: ${data.packageName}`, amount: pkgAdvance, method: b.payMethod || "Cash", date: new Date().toLocaleDateString("en-CA"), note: "Advance" });
+  // কাজ তৈরির সময় অগ্রিম নিলে রশিদ রেকর্ড
+  if (job.paid > 0 && !(job.usePackage && job.deductFrom === "money"))
+    await createPayment({ client: clientId, job: job._id, kind: "job", label: `${job.serviceType}${job.title ? " — " + job.title : ""} (${job.date})`, amount: job.paid, method: b.payMethod || "Cash", date: new Date().toLocaleDateString("en-CA"), note: "Advance" }, false);
+  return NextResponse.json(job);
 }
